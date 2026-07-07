@@ -24,6 +24,11 @@ class TestBigQuery(Validator):
     maxDiff = None
 
     def test_bigquery(self):
+        # Presto's SHA512 takes VARBINARY, so annotated string args are wrapped in TO_UTF8
+        expr = self.parse_one("SELECT SHA512('foo')")
+        annotated = annotate_types(expr, dialect="bigquery")
+        self.assertEqual(annotated.sql("presto"), "SELECT LOWER(TO_HEX(SHA512(TO_UTF8('foo'))))")
+
         self.validate_identity(
             "SELECT 'foo' 'bar'",
             "SELECT CONCAT('foo', 'bar')",
@@ -144,6 +149,9 @@ class TestBigQuery(Validator):
 
         column = self.validate_identity("SELECT `db.t`.`c` FROM `db.t`").selects[0]
         self.assertEqual(len(column.parts), 3)
+
+        column = self.validate_identity("SELECT `p.d.t`.`c`.`f` FROM `p.d.t`").selects[0]
+        column.this.assert_is(exp.Dot)
 
         select_with_quoted_udf = self.validate_identity("SELECT `p.d.UdF`(data) FROM `p.d.t`")
         self.assertEqual(select_with_quoted_udf.selects[0].name, "p.d.UdF")
@@ -1173,8 +1181,8 @@ LANGUAGE js AS
                 "clickhouse": "SHA512(x)",
                 "bigquery": "SHA512(x)",
                 "spark2": "SHA2(x, 512)",
-                "presto": "SHA512(x)",
-                "trino": "SHA512(x)",
+                "presto": "LOWER(TO_HEX(SHA512(x)))",
+                "trino": "LOWER(TO_HEX(SHA512(x)))",
             },
         )
         self.validate_all(
