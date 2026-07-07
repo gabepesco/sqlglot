@@ -470,7 +470,7 @@ class TSQLParser(parser.Parser):
 
         return self.expression(exp.Extract(this=name, expression=expression))
 
-    def _parse_alter_table_set(self) -> exp.AlterSet:
+    def _parse_alter_table_set(self) -> exp.Expression:
         return self._parse_wrapped(super()._parse_alter_table_set)
 
     def _parse_wrapped_select(self, table: bool = False) -> exp.Expr | None:

@@ -1,10 +1,8 @@
 from __future__ import annotations
 
-import typing as t
-
 from sqlglot import exp, parser
 from sqlglot.dialects.dialect import build_date_delta, build_formatted_time
-from sqlglot.helper import ensure_list, seq_get
+from sqlglot.helper import seq_get
 from sqlglot.parsers.spark import SparkParser
 from sqlglot.tokens import TokenType
 
@@ -59,9 +57,9 @@ class DatabricksParser(SparkParser):
 
     ALTERABLES = SparkParser.ALTERABLES | {TokenType.SCHEMA, TokenType.DATABASE}
 
-    SCHEMA_ALTER_PARSERS: t.ClassVar[dict[str, t.Callable]] = {
-        "DEFAULT": lambda self: self._parse_alter_schema_default(),
-        "SET": lambda self: self._parse_alter_schema_set(),
+    ALTER_PARSERS = {
+        **SparkParser.ALTER_PARSERS,
+        "DEFAULT": lambda self: self._parse_alter_schema_default_collation(),
         "OWNER": lambda self: self._parse_alter_schema_owner(),
         "RETAIN": lambda self: self._parse_alter_schema_retain_dropped(),
         "UNSET": lambda self: self._parse_alter_schema_unset_tags(),
@@ -70,56 +68,17 @@ class DatabricksParser(SparkParser):
         "INHERIT": lambda self: self._parse_alter_schema_predictive_opt("INHERIT"),
     }
 
-    def _parse_alter(self) -> exp.Alter | exp.Command:
-        start = self._prev
-        iceberg = self._match_text_seq("ICEBERG")
-        alter_token = self._match_set(self.ALTERABLES) and self._prev
-
-        if not alter_token:
-            return self._parse_as_command(start)
-
-        if alter_token.token_type not in (TokenType.SCHEMA, TokenType.DATABASE):
-            self._retreat(self._index - (2 if iceberg else 1))
-            return super()._parse_alter()
-
-        exists = self._parse_exists()
-        this = self._parse_table(schema=True, parse_partition=False)
-
-        if self._next:
-            self._advance()
-
-        schema_parser = (
-            self.SCHEMA_ALTER_PARSERS.get(self._prev.text.upper()) if self._prev else None
-        )
-        if schema_parser:
-            actions = ensure_list(schema_parser(self))
-            if not self._curr and actions:
-                return self.expression(
-                    exp.Alter(
-                        this=this,
-                        kind=alter_token.text.upper(),
-                        exists=exists,
-                        actions=actions,
-                    )
-                )
-
-        return self._parse_as_command(start)
-
-    def _parse_alter_schema_default(self) -> exp.Expression:
-        self._match_text_seq("COLLATION")
-        return self.expression(exp.AlterSchemaDefaultCollation(this=self._parse_field()))
-
-    def _parse_alter_schema_predictive_opt(self, mode: str) -> exp.Expression:
-        self._match_text_seq("PREDICTIVE", "OPTIMIZATION")
-        return self.expression(exp.AlterSchemaPredictiveOptimization(this=mode))
-
-    def _parse_alter_schema_set(self) -> exp.Expression:
+    def _parse_alter_table_set(self) -> exp.Expression:
         if self._match_text_seq("DBPROPERTIES"):
-            exprs = self._parse_wrapped_csv(self._parse_property)
-            return self.expression(exp.AlterSchemaSetDbProperties(expressions=exprs))
+            return self.expression(
+                exp.AlterSchemaSetDbProperties(
+                    expressions=self._parse_wrapped_csv(self._parse_property)
+                )
+            )
         if self._match_text_seq("TAGS"):
-            exprs = self._parse_wrapped_csv(self._parse_assignment)
-            return self.expression(exp.AlterSchemaSetTags(expressions=exprs))
+            return self.expression(
+                exp.AlterSchemaSetTags(expressions=self._parse_wrapped_csv(self._parse_assignment))
+            )
         if self._match_text_seq("DEFAULT", "COLLATION"):
             return self.expression(exp.AlterSchemaDefaultCollation(this=self._parse_field()))
         if self._match_text_seq("MANAGED", "LOCATION"):
@@ -127,12 +86,20 @@ class DatabricksParser(SparkParser):
         if self._match_text_seq("OWNER", "TO"):
             return self.expression(exp.AlterSchemaOwner(this=self._parse_id_var()))
         if self._match_text_seq("RETAIN", "DROPPED", "TO"):
-            return self._parse_alter_schema_retain_dropped_value()
-        return self._parse_alter_table_set()
+            return self.expression(self._parse_alter_schema_retain_dropped_value())
+        return super()._parse_alter_table_set()
+
+    def _parse_alter_schema_default_collation(self) -> exp.Expression:
+        self._match_text_seq("COLLATION")
+        return self.expression(exp.AlterSchemaDefaultCollation(this=self._parse_field()))
 
     def _parse_alter_schema_owner(self) -> exp.Expression:
         self._match_text_seq("TO")
         return self.expression(exp.AlterSchemaOwner(this=self._parse_id_var()))
+
+    def _parse_alter_schema_predictive_opt(self, mode: str) -> exp.Expression:
+        self._match_text_seq("PREDICTIVE", "OPTIMIZATION")
+        return self.expression(exp.AlterSchemaPredictiveOptimization(this=mode))
 
     def _parse_alter_schema_retain_dropped(self) -> exp.Expression:
         self._match_text_seq("DROPPED", "TO")
@@ -145,8 +112,11 @@ class DatabricksParser(SparkParser):
 
     def _parse_alter_schema_unset_tags(self) -> exp.Expression:
         self._match_text_seq("TAGS")
-        exprs = self._parse_wrapped_csv(self._parse_string)
-        return self.expression(exp.AlterSchemaSetTags(expressions=exprs, unset=True))
+        return self.expression(
+            exp.AlterSchemaSetTags(
+                expressions=self._parse_wrapped_csv(self._parse_string), unset=True
+            )
+        )
 
     def _parse_cluster_property(self):
         if self._match_texts(("AUTO", "NONE")):
