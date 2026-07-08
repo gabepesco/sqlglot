@@ -546,3 +546,25 @@ class TestDatabricks(Validator):
         self.validate_identity("DECLARE x, y, z INT DEFAULT 1", "DECLARE x, y, z INT = 1")
         self.validate_identity("DECLARE x INT = 1")
         self.validate_identity("DECLARE OR REPLACE x INT = 1")
+
+    def test_alter_schema(self):
+        self.validate_identity(
+            "ALTER SCHEMA mydb SET DBPROPERTIES ('k1'='v1', 'k2'='v2')"
+        )
+        self.validate_identity(
+            "ALTER DATABASE mydb SET DBPROPERTIES ('k1'='v1')"
+        )
+        self.validate_identity(
+            "ALTER SCHEMA mydb OWNER TO `some.user@example.com`"
+        )
+        # SET OWNER TO is also valid (optional SET prefix); normalizes to OWNER TO
+        self.validate_identity(
+            "ALTER SCHEMA mydb SET OWNER TO `alf@melmak.et`",
+            "ALTER SCHEMA mydb OWNER TO `alf@melmak.et`",
+        )
+        self.validate_identity(
+            "ALTER SCHEMA mydb SET TAGS ('tag1' = 'val1', 'tag2' = 'val2')"
+        )
+        self.validate_identity(
+            "ALTER SCHEMA mydb UNSET TAGS ('tag1', 'tag2')"
+        )

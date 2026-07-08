@@ -296,3 +296,13 @@ class HiveParser(parser.Parser):
             key = exp.to_identifier(f"col{index + 1}")
 
         return self.expression(exp.PropertyEQ(this=key, expression=expression))
+
+    def _parse_alter_table_set(self):
+        if self._match_text_seq("DBPROPERTIES"):
+            return self.expression(
+                exp.AlterSet(
+                    expressions=self._parse_wrapped_csv(self._parse_property),
+                    option=exp.var("DBPROPERTIES"),
+                )
+            )
+        return super()._parse_alter_table_set()

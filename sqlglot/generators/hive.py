@@ -478,17 +478,24 @@ class HiveGenerator(generator.Generator):
 
     def alterset_sql(self, expression: exp.AlterSet) -> str:
         exprs = self.expressions(expression, flat=True)
-        exprs = f" {exprs}" if exprs else ""
+        option = self.sql(expression, "option")
+        if option == "DBPROPERTIES":
+            exprs = f" {option} ({exprs})" if exprs else ""
+            option = ""
+        else:
+            exprs = f" {exprs}" if exprs else ""
+        option = f" {option}" if option else ""
         location = self.sql(expression, "location")
         location = f" LOCATION {location}" if location else ""
         file_format = self.expressions(expression, key="file_format", flat=True, sep=" ")
         file_format = f" FILEFORMAT {file_format}" if file_format else ""
         serde = self.sql(expression, "serde")
         serde = f" SERDE {serde}" if serde else ""
-        tags = self.expressions(expression, key="tag", flat=True, sep="")
-        tags = f" TAGS {tags}" if tags else ""
+        tags = self.expressions(expression, key="tag", flat=True)
+        tags = f" TAGS ({tags})" if tags else ""
 
-        return f"SET{serde}{exprs}{location}{file_format}{tags}"
+
+        return f"SET{option}{serde}{exprs}{location}{file_format}{tags}"
 
     def serdeproperties_sql(self, expression: exp.SerdeProperties) -> str:
         prefix = "WITH " if expression.args.get("with_") else ""

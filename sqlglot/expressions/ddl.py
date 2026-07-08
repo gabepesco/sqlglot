@@ -441,3 +441,7 @@ class Execute(Expression):
 
 class ExecuteSql(Execute):
     pass
+
+
+class AlterSchemaOwner(Expression):
+    pass
