@@ -13,6 +13,20 @@ class DatabricksParser(SparkParser):
     COLON_IS_VARIANT_EXTRACT = True
     COLON_CHAIN_IS_SINGLE_EXTRACT = False
 
+    ALTERABLES = SparkParser.ALTERABLES | {TokenType.SCHEMA, TokenType.DATABASE}
+
+    ALTER_PARSERS = {
+        **SparkParser.ALTER_PARSERS,
+        "OWNER": lambda self: self._parse_alter_schema_owner(),
+        "UNSET": lambda self: self.expression(
+            exp.Set(
+                tag=self._match_text_seq("TAGS"),
+                expressions=self._parse_wrapped_csv(self._parse_string),
+                unset=True,
+            )
+        ),
+    }
+
     FUNCTIONS = {
         **SparkParser.FUNCTIONS,
         "IFF": exp.If.from_arg_list,
@@ -59,3 +73,18 @@ class DatabricksParser(SparkParser):
         if self._match_texts(("AUTO", "NONE")):
             return self.expression(exp.ClusterProperty(this=self._prev.text.upper()))
         return super()._parse_cluster_property()
+
+    def _parse_alter_schema_owner(self):
+        self._match_text_seq("TO")
+        return self.expression(exp.AlterSchemaOwner(this=self._parse_id_var()))
+
+    def _parse_alter_table_set(self):
+        if self._match_text_seq("OWNER", "TO"):
+            return self.expression(exp.AlterSchemaOwner(this=self._parse_id_var()))
+        if self._match_text_seq("TAGS"):
+            return self.expression(
+                exp.AlterSet(
+                    tag=self._parse_wrapped_csv(self._parse_conjunction),
+                )
+            )
+        return super()._parse_alter_table_set()

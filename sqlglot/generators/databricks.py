@@ -112,3 +112,13 @@ class DatabricksGenerator(SparkGenerator):
     def clusterproperty_sql(self, expression):
         this = self.sql(expression, "this") or f"({self.expressions(expression, flat=True)})"
         return f"CLUSTER BY {this}"
+
+    def alterschemaowner_sql(self, expression):
+        return f"OWNER TO {self.sql(expression, 'this')}"
+
+    def set_sql(self, expression: exp.Set) -> str:
+        if expression.args.get("tag"):
+            exprs = self.expressions(expression, flat=True)
+            verb = "UNSET" if expression.args.get("unset") else "SET"
+            return f"{verb} TAGS ({exprs})"
+        return super().set_sql(expression)

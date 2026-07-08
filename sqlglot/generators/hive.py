@@ -485,8 +485,8 @@ class HiveGenerator(generator.Generator):
         file_format = f" FILEFORMAT {file_format}" if file_format else ""
         serde = self.sql(expression, "serde")
         serde = f" SERDE {serde}" if serde else ""
-        tags = self.expressions(expression, key="tag", flat=True, sep="")
-        tags = f" TAGS {tags}" if tags else ""
+        tags = self.expressions(expression, key="tag", flat=True)
+        tags = f" TAGS ({tags})" if tags else ""
 
         return f"SET{serde}{exprs}{location}{file_format}{tags}"
 
