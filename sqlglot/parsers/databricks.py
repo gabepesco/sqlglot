@@ -18,6 +18,7 @@ class DatabricksParser(SparkParser):
     ALTER_PARSERS = {
         **SparkParser.ALTER_PARSERS,
         "OWNER": lambda self: self._parse_alter_schema_owner(),
+        "SET": lambda self: self._parse_databricks_alter_set(),
         "UNSET": lambda self: self.expression(
             exp.Set(
                 tag=self._match_text_seq("TAGS"),
@@ -78,13 +79,9 @@ class DatabricksParser(SparkParser):
         self._match_text_seq("TO")
         return self.expression(exp.AlterSchemaOwner(this=self._parse_id_var()))
 
-    def _parse_alter_table_set(self):
+    def _parse_databricks_alter_set(self):
         if self._match_text_seq("OWNER", "TO"):
             return self.expression(exp.AlterSchemaOwner(this=self._parse_id_var()))
         if self._match_text_seq("TAGS"):
-            return self.expression(
-                exp.AlterSet(
-                    tag=self._parse_wrapped_csv(self._parse_conjunction),
-                )
-            )
-        return super()._parse_alter_table_set()
+            return self.expression(exp.AlterSet(tag=self._parse_wrapped_csv(self._parse_conjunction)))
+        return self._parse_alter_table_set()

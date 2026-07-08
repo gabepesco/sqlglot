@@ -8887,7 +8887,7 @@ class Parser:
         self._match_text_seq("TO")
         return self.expression(exp.AlterRename(this=self._parse_table(schema=True)))
 
-    def _parse_alter_table_set(self) -> exp.Expression:
+    def _parse_alter_table_set(self) -> exp.AlterSet:
         alter_set = self.expression(exp.AlterSet())
 
         if self._match(TokenType.L_PAREN, advance=False) or self._match_text_seq(
