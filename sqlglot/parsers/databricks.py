@@ -45,6 +45,12 @@ class DatabricksParser(SparkParser):
         "CURDATE": lambda self: self._parse_curdate(),
     }
 
+    FUNCTION_PARSERS = {
+        **SparkParser.FUNCTION_PARSERS,
+        "REGR_AVGX": lambda self: self._parse_distinct_arg_function(exp.RegrAvgx, distinct_index=1),
+        "REGR_AVGY": lambda self: self._parse_distinct_arg_function(exp.RegrAvgy),
+    }
+
     FACTOR = {
         **SparkParser.FACTOR,
         TokenType.COLON: exp.JSONExtract,
